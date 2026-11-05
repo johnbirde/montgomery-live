@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Montgomery Syndikatet live</title>
+<script>try { const t = localStorage.getItem("kupong-tema"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<style>
+/* Frostat glas över en mjuk färgbakgrund. Sammanfattning överst, kurva, sedan matcher och rader. */
+:root {
+  --bg: #eef1f7;
+  --glass: rgba(255, 255, 255, 0.58);
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --stroke: rgba(255, 255, 255, 0.75);
+  --hair: rgba(60, 60, 67, 0.12);
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --accent: #007aff;
+  --good: #34c759;
+  --bad: #ff3b30;
+  --open: rgba(118, 118, 128, 0.12);
+  --blob1: #9ec5ff; --blob2: #ffc6e0; --blob3: #b8f0dc;
+  --shadow: 0 10px 40px rgba(31, 38, 64, 0.10), 0 1px 2px rgba(31, 38, 64, 0.06);
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #07090f; --glass: rgba(38, 40, 52, 0.55); --glass-strong: rgba(48, 50, 64, 0.72);
+    --stroke: rgba(255, 255, 255, 0.10); --hair: rgba(255, 255, 255, 0.10);
+    --ink: #f5f5f7; --muted: #98989f; --accent: #0a84ff; --good: #30d158; --bad: #ff453a;
+    --open: rgba(118, 118, 128, 0.24); --blob1: #1a3d8f; --blob2: #6b1f52; --blob3: #0f5a4a;
+    --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #07090f; --glass: rgba(38, 40, 52, 0.55); --glass-strong: rgba(48, 50, 64, 0.72);
+  --stroke: rgba(255, 255, 255, 0.10); --hair: rgba(255, 255, 255, 0.10);
+  --ink: #f5f5f7; --muted: #98989f; --accent: #0a84ff; --good: #30d158; --bad: #ff453a;
+  --open: rgba(118, 118, 128, 0.24); --blob1: #1a3d8f; --blob2: #6b1f52; --blob3: #0f5a4a;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--body); -webkit-font-smoothing: antialiased; position: relative; }
+body::before {
+  content: ""; position: fixed; inset: -10%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(38% 42% at 12% 8%, var(--blob1), transparent 70%),
+    radial-gradient(34% 38% at 92% 18%, var(--blob2), transparent 70%),
+    radial-gradient(40% 44% at 70% 92%, var(--blob3), transparent 70%);
+  filter: blur(30px); opacity: .9;
+}
+.wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 20px; }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+h2 { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+header .muted { margin-top: 4px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #fff; box-shadow: 0 4px 14px rgba(255, 59, 48, .25); }
+.pill.live { background: var(--bad); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.card {
+  background: var(--glass); border: 1px solid var(--stroke); border-radius: 22px; padding: 20px;
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: var(--shadow);
+}
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.tile { display: grid; gap: 4px; align-content: start; }
+.tile .label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.tile .big { font-family: var(--display); font-size: 36px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.tile.main { background: var(--glass-strong); }
+.tile.main .big { font-size: 52px; color: var(--accent); }
+.delta.up { color: var(--good); font-weight: 650; } .delta.down { color: var(--bad); font-weight: 650; }
+.chart h2 { margin-bottom: 8px; }
+.chart svg { width: 100%; height: 220px; display: block; }
+.cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.matches { display: grid; }
+.match { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 6px 12px; padding: 14px 0; border-top: 1px solid var(--hair); }
+.match:first-of-type { border-top: 0; }
+.match .nr { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--muted); width: 26px; height: 26px; border-radius: 50%; background: var(--open); display: grid; place-items: center; }
+.match .teams { font-weight: 600; }
+.match .status { font-size: 12.5px; color: var(--muted); }
+.match .status.on { color: var(--bad); font-weight: 650; }
+.match .score { font-family: var(--display); font-size: 26px; font-weight: 700; text-align: right; line-height: 1; letter-spacing: -0.01em; }
+.probs { grid-column: 2 / 4; display: flex; gap: 3px; height: 24px; font-size: 11.5px; font-weight: 650; }
+.probs span { display: flex; align-items: center; justify-content: center; min-width: 0; white-space: nowrap; overflow: hidden; border-radius: 8px; background: var(--open); color: var(--ink); }
+.probs span.lead { background: var(--accent); color: #fff; }
+.ours { grid-column: 2 / 4; font-size: 12.5px; color: var(--muted); }
+.ours b { color: var(--ink); }
+.table-wrap { overflow-x: auto; margin: 0 -6px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 14px; }
+th, td { padding: 9px 6px; text-align: right; border-bottom: 1px solid var(--hair); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+th { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+th:first-child, td:first-child, th.signs, td.signs { text-align: left; }
+td:first-child { color: var(--muted); }
+td.value { font-weight: 700; }
+.signs span { display: inline-grid; place-items: center; width: 22px; height: 22px; font-size: 11.5px; font-weight: 700; border-radius: 50%; margin-right: 3px; background: var(--open); color: var(--muted); }
+.signs span.ok { color: var(--good); box-shadow: inset 0 0 0 1.5px var(--good); background: transparent; }
+.signs span.ok.done { background: var(--good); color: #fff; box-shadow: none; }
+.signs span.no { color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad); background: transparent; }
+.signs span.no.done { background: var(--bad); color: #fff; box-shadow: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+.legend .signs span { margin-right: 5px; }
+.notes { font-size: 14px; color: var(--muted); max-width: 72ch; }
+.notes p { margin: 6px 0; }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+<style>
+/* Tillägg: hjälte-kort, temaväljare, radlistan */
+.summary { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 980px) { .summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .hero { grid-column: span 2; } }
+
+.hero { background: var(--glass-strong); display: grid; gap: 10px; align-content: start; }
+.hero .big { font-family: var(--display); font-size: 64px; font-weight: 750; letter-spacing: -0.035em; line-height: 1; color: var(--accent); }
+.hero .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--open); color: var(--ink); }
+.chip.up { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.chip.down { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+.hero .stats { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 28px; margin-top: 6px; }
+.hero .stats div { font-size: 12.5px; color: var(--muted); }
+.hero .stats b { display: block; font-family: var(--display); font-size: 20px; color: var(--ink); letter-spacing: -0.01em; }
+.tile .sub { font-size: 13px; color: var(--muted); }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--open); gap: 2px; }
+.seg button { font: 600 12.5px var(--body); color: var(--muted); background: transparent; border: 0; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--glass-strong); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg button:focus-visible, .more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hdr-right { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+tr.dead td { opacity: .42; }
+tr.dead td.signs span { filter: saturate(.6); }
+.more { margin-top: 12px; font: 600 13.5px var(--body); color: var(--accent); background: var(--open); border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; width: 100%; }
+.match .score { display: inline-flex; align-items: center; justify-content: flex-end; }
+.chart .cap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.chart svg { height: auto; }
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+.wrap > * { min-width: 0; }
+.card { min-width: 0; }
+@media (max-width: 640px) {
+  .wrap { padding: 16px 12px 40px; gap: 14px; }
+  .card { padding: 16px; border-radius: 18px; }
+  h1 { font-size: 26px; }
+  h2 { font-size: 18px; }
+  header { align-items: flex-start; }
+  .hdr-right { width: 100%; justify-content: space-between; gap: 8px; }
+  .seg button { padding: 5px 9px; }
+  .probs span { font-size: 11px; }
+  .summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .hero { grid-column: span 2; }
+  .hero .big { font-size: 48px; }
+  .hero .stats { gap: 4px 18px; }
+  .hero .stats b { font-size: 17px; }
+  .tile .big { font-size: 26px; }
+  .summary > .tile:last-child { grid-column: span 2; }
+  .match { grid-template-columns: 26px minmax(0, 1fr) auto; padding: 12px 0; }
+  .match .score { font-size: 22px; }
+  /* radtabellen blir kort */
+  .table-wrap { margin: 0; overflow: visible; }
+  #rows, #rows tbody { display: block; }
+  #rows thead { display: none; }
+  #rows tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+  #rows tbody tr:last-child { border-bottom: 0; }
+  #rows td { display: block; padding: 0; border: 0; text-align: left; font-size: 13px; }
+  #rows td[data-l]::before { content: attr(data-l) " "; color: var(--muted); font-weight: 500; font-size: 12px; }
+  #rows td.rid { font-weight: 700; color: var(--ink); font-size: 15px; }
+  #rows td.rid::before { content: "Rad "; color: var(--muted); font-weight: 500; }
+  #rows td.value { margin-left: auto; font-size: 16px; order: 2; }
+  #rows td.value::before { display: none; }
+  #rows td.signs { order: 3; flex-basis: 100%; white-space: normal; }
+  #rows td.now, #rows td.pp, #rows td.pe { order: 4; }
+  .signs span { width: 26px; height: 26px; font-size: 12px; margin: 0 3px 3px 0; }
+}
+.events { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
+.ev { display: grid; grid-template-columns: 46px 12px minmax(0, 1fr) auto; gap: 2px 10px; padding: 11px 0; border-top: 1px solid var(--hair); align-items: start; }
+.ev:first-child { border-top: 0; }
+.ev .t { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.ev .mark { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; background: var(--muted); }
+.ev.mal .mark { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+.ev.utdelning .mark { background: var(--good); }
+.ev .what { font-weight: 650; }
+.ev .what .m { font-weight: 500; color: var(--muted); }
+.ev .what .evt { display: block; font-weight: 500; margin-top: 1px; }
+.ev.mal .what .evt { font-weight: 650; color: var(--accent); }
+.ev .fx { grid-column: 3 / 5; font-size: 13px; color: var(--muted); }
+.ev .d { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.ev .d.up { color: var(--good); } .ev .d.down { color: var(--bad); }
+@media (max-width: 640px) { .ev { grid-template-columns: 40px 12px minmax(0, 1fr) auto; gap: 2px 8px; } }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.w { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 6px 12px; padding: 12px 0; border-top: 1px solid var(--hair); }
+.w:first-child { border-top: 0; }
+.w .nr { font-size: 13px; font-weight: 700; color: var(--muted); width: 26px; height: 26px; border-radius: 50%; background: var(--open); display: grid; place-items: center; }
+.w .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; align-items: baseline; }
+.w .head .m { font-weight: 600; }
+.w .head .st { font-size: 12.5px; color: var(--muted); }
+.w .opts { grid-column: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.opt { border-radius: 12px; padding: 7px 10px; background: var(--open); display: grid; gap: 1px; }
+.opt .s { font-size: 11.5px; color: var(--muted); font-weight: 650; }
+.opt .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.opt.best { background: color-mix(in srgb, var(--good) 20%, transparent); }
+.opt.best .s { color: var(--good); }
+.opt.worst .v { color: var(--bad); }
+.opt.long { opacity: .55; }
+.w .verdict { grid-column: 2; font-size: 13.5px; line-height: 1.5; }
+.w .verdict .pos { color: var(--good); font-weight: 700; } .w .verdict .neg { color: var(--bad); font-weight: 700; }
+.opt.best .v { color: var(--good); }
+.opt.cur { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.dist-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px 18px; margin: 6px 0 14px; }
+.dist-stats div { font-size: 12.5px; color: var(--muted); }
+.dist-stats b { display: block; font-size: 22px; color: var(--ink); letter-spacing: -0.01em; }
+.bars { display: grid; gap: 7px; }
+.bar { display: grid; grid-template-columns: 130px minmax(0, 1fr) 54px; gap: 10px; align-items: center; font-size: 13px; }
+.bar .track { height: 12px; border-radius: 6px; background: var(--open); overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 6px; background: var(--accent); min-width: 2px; }
+.bar .pv { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+@media (max-width: 640px) { .bar { grid-template-columns: 104px minmax(0, 1fr) 48px; } }
+.pgrid { grid-column: 2 / 4; display: grid; grid-template-columns: 46px repeat(3, minmax(0, 1fr)); gap: 4px 5px; align-items: center; margin-top: 4px; }
+.pgrid .pl { font-size: 12px; color: var(--muted); font-weight: 600; }
+.pgrid .ph { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; }
+.pc { position: relative; height: 26px; border-radius: 8px; background: var(--open); overflow: hidden; display: grid; place-items: center; }
+.pc i { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.pc b { position: relative; font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.pc b em { font-style: normal; font-size: 11px; font-weight: 750; margin-left: 4px; }
+.pc b em.up { color: var(--good); } .pc b em.down { color: var(--bad); }
+.pgrid .ph.now { color: var(--accent); }
+.match .score { flex-direction: column; align-items: flex-end; gap: 3px; }
+.minute { font-family: var(--body); font-size: 12px; font-weight: 700; color: #fff; background: var(--bad); border-radius: 999px; padding: 2px 8px; letter-spacing: .02em; }
+.minute.done { background: var(--open); color: var(--muted); }
+.mdots { display: grid; grid-template-columns: repeat(auto-fill, minmax(26px, 1fr)); gap: 5px; margin: 8px 0 4px; }
+.md { height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--open); color: var(--muted); }
+.md.live { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad); animation: pulse 1.6s ease-in-out infinite; }
+.md.done { background: var(--ink); color: var(--bg); }
+.best-row { margin: 8px 0 4px; display: flex; flex-wrap: wrap; gap: 3px; }
+.best-row span { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .md.live { animation: none; } }
+.pays { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 8px; }
+.pay { border-radius: 14px; padding: 10px 12px; background: var(--open); display: grid; gap: 2px; }
+.pay .lv { font-size: 12.5px; color: var(--muted); font-weight: 650; }
+.pay b { font-size: 22px; letter-spacing: -0.01em; }
+.pay .pw { font-size: 12px; color: var(--muted); }
+.pay .pw strong { color: var(--ink); }
+.pay.hit { background: color-mix(in srgb, var(--good) 18%, transparent); }
+.pay.hit .pw strong { color: var(--good); }
+@media (max-width: 640px) { .pays { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pay b { font-size: 19px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow" id="group"></div>
+      <h1 id="title"></h1>
+      <div class="muted" id="subtitle"></div>
+    </div>
+    <div class="hdr-right">
+      <span class="pill live" id="livepill"></span>
+      <span class="muted num" id="updated"></span>
+      <div class="seg" role="group" aria-label="Utseende">
+        <button type="button" id="th-auto">Auto</button>
+        <button type="button" id="th-light">Ljust</button>
+        <button type="button" id="th-dark">Mörkt</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="card payouts" id="payouts-card">
+    <div class="cap"><h2>Utdelning just nu</h2><span class="muted" id="payouts-note" style="font-size:13px"></span></div>
+    <div class="pays" id="payouts"></div>
+  </section>
+
+  <section class="summary">
+    <div class="card hero">
+      <div class="tile"><div class="label">Kupongens värde nu</div></div>
+      <div class="big num" id="v-now"></div>
+      <div class="row" id="v-delta"></div>
+      <div class="stats num" id="v-stats"></div>
+    </div>
+    <div class="card tile">
+      <div class="label" id="v-top-label"></div>
+      <div class="big num" id="v-top"></div>
+      <div class="sub num" id="v-top-sub"></div>
+      <div id="v-top-spark"></div>
+    </div>
+    <div class="card tile">
+      <div class="label">Om det slutar så här</div>
+      <div class="big num" id="v-best"></div>
+      <div class="signs best-row" id="v-best-row"></div>
+      <div class="sub num" id="v-best-sub"></div>
+    </div>
+    <div class="card tile">
+      <div class="label">Matcher</div>
+      <div class="big num" id="v-matches"></div>
+      <div class="mdots" id="v-mdots"></div>
+      <div class="sub" id="v-matches-sub"></div>
+    </div>
+  </section>
+
+  <section class="card" id="events-card">
+    <h2>Händelser</h2>
+    <ol class="events" id="events"></ol>
+    <button type="button" class="more" id="events-more"></button>
+  </section>
+
+  <section class="card" id="weights-card">
+    <h2>Vad vill vi ska hända?</h2>
+    <div class="muted" style="font-size:13px;margin:2px 0 4px">Hur kupongens värde ändras mot nu om matchen slutar 1, X eller 2, och chansen för varje utfall. Sorterat på vad som realistiskt står på spel: skillnaden mellan bästa och sämsta utfallet som har minst 10 % chans. Utfall under 10 % visas som långskott.</div>
+    <div id="weights"></div>
+  </section>
+
+  <section class="card chart">
+    <div class="cap"><h2>Kupongens värde under kvällen</h2><span class="muted num" id="chart-cap"></span></div>
+    <div id="chart"></div>
+  </section>
+
+  <section class="card" id="dist-card">
+    <div class="cap"><h2>Hur kan det sluta?</h2><span class="muted" id="dist-method" style="font-size:13px"></span></div>
+    <div class="dist-stats num" id="dist-stats"></div>
+    <div class="bars" id="dist-bars"></div>
+    <div class="muted" style="font-size:12.5px;margin-top:10px">Fördelningen av kupongens slututdelning över alla möjliga utfall i matcherna som återstår, viktade med Oddsets sannolikheter. Antar oberoende matcher och modellens förväntade utdelning per nivå.</div>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Matcherna</h2>
+      <div class="muted" style="font-size:13px;margin:2px 0 6px">Per match i procent för 1, X och 2: Oddsets livespelsodds, oddsen vid avspark, andelen av våra rader och Svenska folkets streckning. I raden Våra visar den gröna eller röda siffran hur mycket vi spelat mer eller mindre än folket (procentenheter).</div>
+      <div class="matches" id="matches"></div>
+    </section>
+    <section class="card">
+      <h2>Våra rader</h2>
+      <div class="muted" style="font-size:13px;margin:2px 0 8px" id="rows-note"></div>
+      <div class="table-wrap"><table id="rows"></table></div>
+      <button type="button" class="more" id="more"></button>
+      <div class="legend">
+        <span class="signs"><span class="ok done">1</span>rätt, klar</span>
+        <span class="signs"><span class="ok">1</span>rätt just nu</span>
+        <span class="signs"><span class="no">1</span>fel just nu</span>
+        <span class="signs"><span class="no done">1</span>fel, klar</span>
+        <span class="signs"><span>1</span>ej startad</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card notes">
+    <h2>Så räknas det</h2>
+    <p>Modellen levererar före spelstopp varje rad med förväntad utdelning per vinstnivå. Under kvällen räknas sannolikheten om för varje rad: färdiga matcher är 0 eller 100 %, övriga får sin sannolikhet från Oddsets odds med spelbolagets marginal borttagen. Värdet är summan av sannolikhet gånger förväntad utdelning. Chansen att någon rad får alla rätt är summan av radernas chans, eftersom raderna är olika.</p>
+  </section>
+</div>
+
+<script>
+function main(D) {
+const SIGNS = ["1", "X", "2"];
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const kr = v => v >= 100 ? Math.round(v).toLocaleString("sv-SE") + " kr" : v.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " kr";
+const krInt = v => Math.round(v).toLocaleString("sv-SE") + " kr";
+const chance = p => p >= 0.9995 ? "100 %" : p <= 0 ? "0 %" : p >= 0.1 ? Math.round(p * 100) + " %" : "1 på " + Math.round(1 / p).toLocaleString("sv-SE");
+const pct = p => p >= 0.9995 ? "100 %" : p <= 0 ? "0 %" : p < 0.1 ? (p * 100).toFixed(1).replace(".", ",") + " %" : Math.round(p * 100) + " %";
+const hhmm = t => new Date(t).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+const $ = id => document.getElementById(id);
+
+// tema
+function setTheme(t) {
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  store.set("kupong-tema", t);
+  for (const [id, v] of [["th-auto", "auto"], ["th-light", "light"], ["th-dark", "dark"]]) $(id).setAttribute("aria-pressed", String(v === t));
+}
+setTheme(store.get("kupong-tema") || "auto");
+$("th-auto").onclick = () => setTheme("auto"); $("th-light").onclick = () => setTheme("light"); $("th-dark").onclick = () => setTheme("dark");
+
+// sammanfattning
+const topLv = D.levels[0];
+$("title").textContent = D.title;
+$("group").textContent = D.group || "";
+$("subtitle").textContent = `${D.rows.length} rader, ${D.shares} andelar. Spelstopp ${D.close ? hhmm(D.close) : "?"}.`;
+const pill = $("livepill");
+pill.innerHTML = D.state === "live" ? '<span class="dot"></span>LIVE' : D.state === "klar" ? "KLAR" : "FÖRE SPELSTOPP";
+pill.style.background = D.state === "live" ? "var(--bad)" : D.state === "klar" ? "var(--good)" : "var(--muted)";
+$("updated").textContent = "uppdaterad " + hhmm(D.updated);
+
+const v0 = D.series.length ? D.series[0][1] : D.total, d = D.total - v0, vsStake = D.total - D.stake;
+$("v-now").textContent = krInt(D.total);
+$("v-delta").innerHTML = `<span class="chip ${d >= 0 ? "up" : "down"}">${d >= 0 ? "▲" : "▼"} ${krInt(Math.abs(d))} sedan start</span>
+  <span class="chip ${vsStake >= 0 ? "up" : "down"}">${vsStake >= 0 ? "+" : "−"}${Math.round(Math.abs(vsStake / D.stake) * 100)} % mot insats</span>`;
+$("v-stats").innerHTML = `<div><b>${krInt(D.total / D.shares)}</b>per andel (1/${D.shares})</div><div><b>${krInt(D.stake)}</b>insats</div><div><b>${krInt(D.stake / D.shares)}</b>insats per andel</div>`;
+
+const pTop = D.rows.reduce((a, r) => a + r.P[0], 0);
+$("v-top-label").textContent = `Chans till ${topLv} rätt`;
+$("v-top").textContent = chance(pTop);
+$("v-top-sub").textContent = `någon av raderna, ${pct(pTop)}`;
+const best = D.rows.reduce((a, b) => (b.now > a.now || (b.now === a.now && b.value > a.value)) ? b : a);
+$("v-best").textContent = `${best.now} rätt`;
+const alive = D.rows.filter(r => r.max >= topLv).length;
+const allDone = D.matches.length && D.matches.every(m => m.finished);
+$("v-best-sub").textContent = allDone ? `rad nr ${best.id}, slutresultat` : `bästa rad (nr ${best.id}) med ställningen just nu. ${alive} av ${D.rows.length} rader kan fortfarande nå ${topLv} rätt.`;
+if (allDone) document.querySelector("#v-best").previousElementSibling.textContent = "Bästa rad";
+const N = D.matches.length, done = D.matches.filter(m => m.finished).length, on = D.matches.filter(m => m.started && !m.finished).length;
+$("v-matches").textContent = `${done}/${N} klara`;
+$("v-mdots").innerHTML = D.matches.map(m => {
+  const st = m.finished ? "done" : m.started ? "live" : "pre";
+  return `<span class="md ${st}" title="${m.nr}. ${m.home} – ${m.away} ${m.score.replace("-", "–")}">${m.nr}</span>`; }).join("");
+$("v-best-row").innerHTML = best.signs.map((s, i) => { const m = D.matches[i]; let c = "";
+  if (m && m.started && m.current !== null) c = (m.current === s ? "ok" : "no") + (m.finished ? " done" : "");
+  return `<span class="${c}">${SIGNS[s]}</span>`; }).join("");
+(function spark() {
+  const P = D.series.filter(x => x.length > 2).map(([t, , p]) => [new Date(t).getTime(), p]);
+  if (P.length < 3) return;
+  const W = 220, H = 44, t0 = P[0][0], t1 = P[P.length - 1][0], hi = Math.max(...P.map(x => x[1]), 1e-9);
+  const pts = P.map(([t, p]) => `${(W * (t - t0) / Math.max(1, t1 - t0)).toFixed(1)},${(H - 3 - (H - 6) * p / hi).toFixed(1)}`).join(" ");
+  const top = P.reduce((a, b) => b[1] > a[1] ? b : a);
+  $("v-top-spark").innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:44px;display:block;margin-top:8px" aria-hidden="true">
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>
+    <div class="sub">högst i kväll: ${chance(top[1])} (${hhmm(top[0])})</div>`;
+})();
+$("v-matches-sub").textContent = on ? `${on} pågår` : (done === N ? "alla klara" : "väntar på avspark");
+
+// utdelning per nivå (Svenska Spels prognos) och våra rader på varje nivå med ställningen nu
+(function payouts() {
+  const P = D.payouts || [];
+  if (!P.length) { $("payouts-card").hidden = true; return; }
+  let ours = 0;
+  $("payouts").innerHTML = P.map(x => {
+    const mine = D.rows.filter(r => r.now === x.level).length; ours += mine * (x.kr || 0);
+    return `<div class="pay ${mine ? "hit" : ""}"><span class="lv">${x.level} rätt</span><b class="num">${krInt(x.kr || 0)}</b>
+      <span class="pw num">${x.n === "" ? "" : `${Number(x.n).toLocaleString("sv-SE")} vinnare · `}<strong>${mine}</strong> av våra rader</span></div>`; }).join("");
+  const done = D.matches.length && D.matches.every(m => m.finished);
+  const net = w => { const d = w - D.stake; return `${d >= 0 ? "+" : "−"}${krInt(Math.abs(d))} (${d >= 0 ? "+" : "−"}${krInt(Math.abs(d) / D.shares)} per andel)`; };
+  $("payouts-card").querySelector("h2").textContent = done ? "Utdelning" : "Utdelning just nu";
+  $("payouts-note").textContent = done
+    ? (ours > 0 ? `Vi vann ${krInt(ours)}` : `Ingen av våra rader fick ${P[P.length - 1].level} rätt eller mer`) + ` · netto ${net(ours)}`
+    : `Svenska Spels prognos · om det slutar så här vinner vi ${krInt(ours)}, netto ${net(ours)}`;
+})();
+
+// matcher
+const counts = D.matches.map(() => [0, 0, 0]); D.rows.forEach(r => r.signs.forEach((s, i) => counts[i] && counts[i][s]++));
+$("matches").innerHTML = D.matches.map((m, i) => {
+  const p = m.probs, lead = p.indexOf(Math.max(...p));
+  const status = !m.started ? `avspark ${m.start}` : m.finished ? "slut" : (m.min !== "" && m.status !== "Halvtid" ? `${m.min}'` : m.status);
+  const live = m.started && !m.finished;
+  return `<div class="match">
+    <div class="nr">${m.nr}</div>
+    <div><div class="teams">${m.home} – ${m.away}</div><div class="status ${live ? "on" : ""}">${status} · ${m.league}</div></div>
+    <div class="score num">${m.score.replace("-", "–")}${live && m.min !== "" && m.status !== "Halvtid" ? `<span class="minute">${m.min}'</span>` : live && m.status === "Halvtid" ? `<span class="minute">HT</span>` : m.finished ? `<span class="minute done">slut</span>` : ""}</div>
+    <div class="pgrid">${[
+      [live ? "Live" : m.finished ? "Slut" : "Odds", p],
+      ["Start", m.pre && m.pre.length === 3 ? m.pre : null],
+      ["Våra", counts[i].map(c => c / D.rows.length)],
+      ["Folket", m.folk && m.folk.some(v => v !== "") ? m.folk.map(v => (+v || 0) / 100) : null],
+    ].filter(([, q]) => q).reduce((html, [lab, q]) => {
+      const folk = m.folk && m.folk.some(v => v !== "") ? m.folk.map(v => (+v || 0) / 100) : null;
+      return html + `<span class="pl">${lab}</span>` + q.map((x, k) => {
+        // i raden Våra: hur mycket vi avviker från folket (procentenheter)
+        const dv = lab === "Våra" && folk ? Math.round(100 * (x - folk[k])) : null;
+        const tag = dv !== null && Math.abs(dv) >= 5 ? `<em class="${dv > 0 ? "up" : "down"}">${dv > 0 ? "+" : "−"}${Math.abs(dv)}</em>` : "";
+        return `<span class="pc" title="${lab} ${SIGNS[k]}: ${pct(x)}"><i style="width:${(100 * x).toFixed(1)}%"></i><b>${pct(x)}${tag}</b></span>`; }).join(""); },
+      `<span></span>` + [0, 1, 2].map(k => `<span class="ph ${m.current === k && m.started ? "now" : ""}">${SIGNS[k]}${m.current === k && m.started ? " · nu" : ""}</span>`).join(""))}</div>
+  </div>`;
+}).join("");
+
+// rader
+const lv = D.levels;
+const known = (D.exp_source || "modell") !== "modell";
+$("rows-note").textContent = `Sorterade på värde. Värde = ${lv.map(l => `P(${l}) × ${known ? "utd" : "exp"} ${l}`).join(" + ")}. ` + (known ? `Utdelningen är nu ${D.exp_source.replace("känd", "känd från Svenska Spel")} och ersätter modellens förväntade utdelning. ` : "") + `Blekta rader kan inte längre nå ${topLv} rätt.`;
+const sorted = [...D.rows].sort((a, b) => b.value - a.value);
+const SHOW = 15;
+let showAll = store.get("kupong-allarader") === "1";
+function renderRows() {
+  const list = showAll ? sorted : sorted.slice(0, SHOW);
+  $("rows").innerHTML = `<thead><tr><th>Rad</th><th class="signs">Tippning</th><th>Rätt nu</th>${lv.map(l => `<th>Chans ${l}</th><th>${known ? "utd" : "exp"} ${l}</th>`).join("")}<th>Värde</th></tr></thead><tbody>` +
+    list.map(r => `<tr class="${r.max < topLv ? "dead" : ""}"><td class="rid">${r.id}</td><td class="signs">${r.signs.map((s, i) => {
+        const m = D.matches[i]; let c = "";
+        if (m && m.started && m.current !== null) c = (m.current === s ? "ok" : "no") + (m.finished ? " done" : "");
+        return `<span class="${c}">${SIGNS[s]}</span>`; }).join("")}</td>
+      <td class="now" data-l="rätt nu">${r.now}</td>${r.P.map((p, k) => `<td class="pp" data-l="chans ${lv[k]}">${chance(p)}</td><td class="muted pe" data-l="${known ? "utd" : "exp"} ${lv[k]}">${krInt(r.exp[k])}</td>`).join("")}<td class="value" data-l="värde">${kr(r.value)}</td></tr>`).join("") + "</tbody>";
+  $("more").textContent = showAll ? `Visa bara de ${SHOW} bästa` : `Visa alla ${sorted.length} rader`;
+  $("more").hidden = sorted.length <= SHOW;
+}
+$("more").onclick = () => { showAll = !showAll; store.set("kupong-allarader", showAll ? "1" : "0"); renderRows(); };
+renderRows();
+
+// matchvikt: vad behöver hända? (förändring mot nu per utfall)
+const A = D.analysis;
+(function weights() {
+  if (!A || !A.weights || !A.weights.length) { $("weights-card").hidden = true; return; }
+  const now = A.mean;
+  const sgn = d => (d >= 0 ? "+" : "−") + krInt(Math.abs(d));
+  const outcomeName = (m, o) => o === 0 ? `${m.home} vinner` : o === 1 ? "oavgjort" : `${m.away} vinner`;
+  const REAL = 0.10;  // utfall med minst 10 % chans räknas som realistiska
+  const prep = w => {
+    const pr = w.p || [1 / 3, 1 / 3, 1 / 3], d = w.values.map(v => v == null ? null : v - now);
+    let real = [0, 1, 2].filter(o => d[o] != null && pr[o] >= REAL);
+    if (!real.length) real = [0, 1, 2].filter(o => d[o] != null);
+    const best = real.reduce((a, o) => d[o] > d[a] ? o : a, real[0]);
+    const worst = real.reduce((a, o) => d[o] < d[a] ? o : a, real[0]);
+    const dream = [0, 1, 2].filter(o => d[o] != null && pr[o] < REAL && d[o] > d[best]).sort((a, b) => d[b] - d[a])[0];
+    return { w, pr, d, best, dream, stake: d[best] - d[worst] };
+  };
+  const list = A.weights.map(prep).sort((a, b) => b.stake - a.stake);
+  $("weights").innerHTML = list.map(({ w, pr, d, best, dream, stake }) => {
+    const m = D.matches[w.nr - 1];
+    const likely = [0, 1, 2].reduce((a, o) => pr[o] > pr[a] ? o : a, 0);
+    const st = !m.started ? `avspark ${m.start}` : `${m.score.replace("-", "–")}${m.min !== "" ? ` · ${m.min}'` : ""}`;
+    let verdict = `<b>Bäst för oss:</b> ${SIGNS[best]} (${outcomeName(m, best)}) <span class="${d[best] >= 0 ? "pos" : "neg"}">${sgn(d[best])}</span> · ${pct(pr[best])} chans`;
+    if (dream !== undefined) verdict += `<br><span class="muted"><b>Långskott:</b> ${SIGNS[dream]} (${outcomeName(m, dream)}) ${sgn(d[dream])} · ${pct(pr[dream])} chans</span>`;
+    verdict += `<br><b>Troligast:</b> ${SIGNS[likely]} (${outcomeName(m, likely)}) <span class="${d[likely] >= 0 ? "pos" : "neg"}">${sgn(d[likely])}</span> · ${pct(pr[likely])} chans`;
+    return `<div class="w"><div class="nr">${w.nr}</div>
+      <div class="head"><span class="m">${m.home} – ${m.away}</span><span class="st">${st} · ${krInt(stake)} på spel</span></div>
+      <div class="verdict">${verdict}</div>
+      <div class="opts">${[0, 1, 2].map(o => {
+        const x = d[o], cls = x == null || Math.abs(x) < 0.5 ? "" : x > 0 ? "best" : "worst";
+        return `<div class="opt ${cls} ${m.current === o && m.started ? "cur" : ""} ${pr[o] < 0.10 ? "long" : ""}">
+          <span class="s">${SIGNS[o]} · ${pct(pr[o])}${m.current === o && m.started ? " · nu" : ""}</span><span class="v">${x == null ? "–" : sgn(x)}</span></div>`; }).join("")}</div></div>`;
+  }).join("");
+})();
+
+// utfallsfördelning
+(function dist() {
+  if (!A) { $("dist-card").hidden = true; return; }
+  $("dist-method").textContent = A.method === "klart" ? "alla matcher klara" : `${A.open} matcher kvar · ${A.method}`;
+  $("dist-stats").innerHTML = [
+    ["chans att gå plus", pct(A.p_plus)], ["chans till någon vinst", pct(A.p_any)],
+    ["median", krInt(A.p50)], ["90:e percentilen", krInt(A.p90)], ["bästa möjliga", krInt(A.max)]
+  ].map(([l, v]) => `<div><b>${v}</b>${l}</div>`).join("");
+  const pmax = Math.max(...A.buckets.map(b => b.p), 0.0001);
+  $("dist-bars").innerHTML = A.buckets.filter(b => b.p > 0.00005).map(b => `<div class="bar"><span>${b.label}</span>
+    <span class="track"><span class="fill" style="display:block;width:${(100 * b.p / pmax).toFixed(1)}%"></span></span><span class="pv">${pct(b.p)}</span></div>`).join("");
+})();
+
+// händelser (senaste först)
+const EV_SHOW = 8;
+let evAll = store.get("kupong-allahandelser") === "1";
+function renderEvents() {
+  const all = D.events || [];
+  if (!all.length) { $("events").innerHTML = '<li class="muted" style="padding:8px 0">Inga händelser ännu. Mål, avspark, halvtid och slut dyker upp här.</li>'; $("events-more").hidden = true; return; }
+  // "kan nå alla rätt" visas bara när antalet ändrats sedan förra slutsignalen
+  let lastAlive = D.rows.length;
+  const aliveNote = new Map();
+  for (const e of all) {
+    if (e.type === "slut" && e.alive !== undefined) {
+      if (e.alive !== lastAlive) aliveNote.set(e, e.alive > 0 ? `${e.alive} rader kan fortfarande nå ${e.level} rätt` : `Inga rader kan längre nå ${e.level} rätt`);
+      lastAlive = e.alive;
+    }
+  }
+  const evs = [...all].reverse();
+  const list = evAll ? evs : evs.slice(0, EV_SHOW);
+  $("events").innerHTML = list.map(e => {
+    const impact = !["halvtid", "avspark"].includes(e.type);
+    const dv = e.after - e.before, moved = impact && Math.abs(dv) >= 0.5;
+    const cls = !moved ? "" : dv > 0 ? "up" : "down";
+    const dtxt = moved ? (dv > 0 ? "+" : "−") + krInt(Math.abs(dv)) : "";
+    const fx = [];
+    if (moved) fx.push(`Kupongen ${krInt(e.before)} → ${krInt(e.after)}`);
+    if (moved && e.p_before != null && e.p_after != null && chance(e.p_before) !== chance(e.p_after)) fx.push(`chans ${e.level} rätt ${chance(e.p_before)} → ${chance(e.p_after)}`);
+    if (e.type === "mål" && e.rows_now != null && e.sign_now) fx.push(`${e.rows_now} av ${D.rows.length} rader har ${e.sign_now}`);
+    if (e.type === "utdelning" && e.match) fx.push(e.match.charAt(0).toUpperCase() + e.match.slice(1));
+    if (aliveNote.has(e)) fx.push(aliveNote.get(e));
+    const title = e.type === "utdelning" && /^alla klara/.test(e.match || "") ? "Slutlig utdelning" : e.title;
+    return `<li class="ev ${e.type === "mål" ? "mal" : e.type}">
+      <span class="t">${hhmm(e.at)}</span><span class="mark"></span>
+      <span class="what">${e.nr ? `<span class="m">${e.nr}.</span> ${e.match}<span class="evt">${title.replace(", ", " ")}${e.min !== undefined && e.min !== "" && e.min !== null ? ` · ${e.min}'` : ""}</span>` : title}</span>
+      <span class="d ${cls}">${dtxt}</span>
+      ${fx.length ? `<span class="fx">${fx.join(" · ")}</span>` : ""}</li>`;
+  }).join("");
+  $("events-more").hidden = evs.length <= EV_SHOW;
+  $("events-more").textContent = evAll ? `Visa bara de ${EV_SHOW} senaste` : `Visa alla ${evs.length} händelser`;
+}
+$("events-more").onclick = () => { evAll = !evAll; store.set("kupong-allahandelser", evAll ? "1" : "0"); renderEvents(); };
+renderEvents();
+
+// kurva
+function goalMarks(x, y, S, t0, t1) {
+  const at = t => { let v = S[0][1]; for (const [ts, val] of S) { if (ts <= t) v = val; else break; } return v; };
+  return (D.events || []).filter(e => e.type === "mål").map(e => {
+    const t = new Date(e.at).getTime(); if (t < t0 || t > t1) return "";
+    const d = e.after - e.before, col = Math.abs(d) < 0.5 ? "var(--muted)" : d > 0 ? "var(--good)" : "var(--bad)";
+    const cx = x(t), cy = y(at(t));
+    return `<g><title>${hhmm(e.at)} ${e.title} (${d >= 0 ? "+" : "−"}${krInt(Math.abs(d))})</title>
+      <line x1="${cx}" x2="${cx}" y1="${cy - 16}" y2="${cy}" stroke="${col}" stroke-width="1.5"/>
+      <circle cx="${cx}" cy="${cy - 20}" r="4.5" fill="${col}" stroke="var(--glass-strong)" stroke-width="2"/></g>`;
+  }).join("");
+}
+function chart() {
+  const S = D.series.map(([t, v]) => [new Date(t).getTime(), v]);
+  if (S.length < 2) { $("chart").innerHTML = '<p class="muted">Kurvan fylls på under kvällen.</p>'; return; }
+  const W = Math.max(280, $("chart").clientWidth || 1000), small = W < 560, H = small ? 190 : 240, L = small ? 40 : 56, R = small ? 54 : 70, T = 16, B = 28;
+  const t0 = S[0][0], t1 = Math.max(S[S.length - 1][0], t0 + 60e3);
+  const vals = S.map(s => s[1]).concat(D.stake);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = Math.max((hi - lo) * 0.15, hi * 0.05, 1); lo = Math.max(0, lo - pad); hi = hi + pad;
+  const x = t => L + (W - L - R) * (t - t0) / (t1 - t0), y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), tick = [1, 2, 2.5, 5, 10].map(k => k * mag).find(s => s >= raw);
+  let g = "";
+  for (let v = Math.ceil(lo / tick) * tick; v <= hi; v += tick) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--hair)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="12" fill="var(--muted)">${Math.round(v).toLocaleString("sv-SE")}</text>`;
+  const span = (t1 - t0) / 60e3, every = span > 240 ? 60 : span > 90 ? 30 : span > 30 ? 10 : 5;
+  for (let t = Math.ceil(t0 / (every * 60e3)) * every * 60e3; t <= t1; t += every * 60e3)
+    g += `<text x="${x(t)}" y="${H - 8}" text-anchor="middle" font-size="12" fill="var(--muted)">${hhmm(t)}</text>`;
+  const pts = S.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const last = S[S.length - 1];
+  $("chart-cap").textContent = `start ${krInt(S[0][1])} · nu ${krInt(last[1])} · högst ${krInt(Math.max(...S.map(s => s[1])))}`;
+  $("chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kupongens värde under kvällen">
+    <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".32"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${g}
+    <line x1="${L}" x2="${W - R}" y1="${y(D.stake)}" y2="${y(D.stake)}" stroke="var(--muted)" stroke-dasharray="3 5"/>
+    <text x="${W - R + 6}" y="${y(D.stake) + 4}" font-size="12" fill="var(--muted)">insats</text>
+    <polygon points="${x(t0)},${y(lo)} ${pts} ${x(last[0])},${y(lo)}" fill="url(#fill)"/>
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    ${goalMarks(x, y, S, t0, t1)}
+    <circle cx="${x(last[0])}" cy="${y(last[1])}" r="5.5" fill="var(--accent)" stroke="var(--glass-strong)" stroke-width="2.5"/>
+    <text x="${x(last[0]) + 10}" y="${y(last[1]) + 4}" font-size="13" font-weight="700" fill="var(--accent)">${krInt(last[1])}</text>
+  </svg>`;
+}
+chart();
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(chart, 150); });
+
+// lokal fil: ladda om var 20:e s och behåll scrollläget (i artefakten byts versionen automatiskt)
+if (location.protocol === "file:") {
+  try { const y = sessionStorage.getItem("kupong-y"); if (y) scrollTo(0, +y); } catch (e) {}
+  setTimeout(() => { try { sessionStorage.setItem("kupong-y", String(scrollY)); } catch (e) {} location.reload(); }, 20000);
+}
+}
+
+// ---- hämta och dekryptera datan (nyckeln finns bara i länkens #-del) ----
+const PARAMS = new URLSearchParams(location.hash.slice(1));
+const DRAW_ID = PARAMS.get("d"), KEY_B64 = PARAMS.get("k");
+const b64 = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+let lastUpdated = null, keyObj = null, rendered = false;
+function showMessage(title, text) {
+  document.querySelector(".wrap").innerHTML = `<header><div><div class="eyebrow">Montgomery Syndikatet</div><h1>${title}</h1><div class="muted">${text}</div></div></header>`;
+}
+async function load() {
+  if (!DRAW_ID || !KEY_B64) { showMessage("Länken är ofullständig", "Använd hela länken från gruppen, inklusive delen efter #."); return; }
+  try {
+    keyObj = keyObj || await crypto.subtle.importKey("raw", b64(KEY_B64), "AES-GCM", false, ["decrypt"]);
+    const r = await fetch(`data/${encodeURIComponent(DRAW_ID)}.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!r.ok) { if (!rendered) showMessage("Ingen data än", "Sidan fylls på när omgången närmar sig spelstopp. Den laddar om sig själv."); return; }
+    const enc = await r.json();
+    if (enc.updated && enc.updated === lastUpdated) return;
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, keyObj, b64(enc.ct));
+    const D = JSON.parse(new TextDecoder().decode(plain));
+    lastUpdated = enc.updated;
+    if (rendered) { location.reload(); return; }   // ny data: rita om (scrollläget behålls)
+    rendered = true;
+    document.title = `${D.group || "Kupongen"} live: ${D.title}`;
+    main(D);
+  } catch (e) {
+    if (!rendered) showMessage("Kunde inte öppna sidan", "Nyckeln i länken stämmer inte för den här omgången. Använd veckans länk.");
+    console.error(e);
+  }
+}
+try { const y = sessionStorage.getItem("kupong-y"); if (y) addEventListener("load", () => setTimeout(() => scrollTo(0, +y), 50)); } catch (e) {}
+addEventListener("beforeunload", () => { try { sessionStorage.setItem("kupong-y", String(scrollY)); } catch (e) {} });
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
