@@ -312,6 +312,7 @@ body { overflow-x: hidden; }
     <h2>Vad vill vi ska hända?</h2>
     <div class="muted" style="font-size:13px;margin:2px 0 4px">Hur kupongens värde ändras mot nu om matchen slutar 1, X eller 2, och chansen för varje utfall. Sorterat på vad som realistiskt står på spel: skillnaden mellan bästa och sämsta utfallet som har minst 10 % chans. Utfall under 10 % visas som långskott.</div>
     <div id="weights"></div>
+    <button type="button" class="more" id="weights-more"></button>
   </section>
 
   <section class="card chart">
@@ -399,6 +400,13 @@ const alive = D.rows.filter(r => r.max >= topLv).length;
 const allDone = D.matches.length && D.matches.every(m => m.finished);
 $("v-best-sub").textContent = allDone ? `rad nr ${best.id}, slutresultat` : `bästa rad (nr ${best.id}) med ställningen just nu. ${alive} av ${D.rows.length} rader kan fortfarande nå ${topLv} rätt.`;
 if (allDone) document.querySelector("#v-best").previousElementSibling.textContent = "Bästa rad";
+if (!D.matches.some(m => m.started)) {  // före avspark: visa den mest värdefulla raden i stället
+  const top = D.rows.reduce((a, b) => b.value > a.value ? b : a);
+  document.querySelector("#v-best").previousElementSibling.textContent = "Mest värdefulla rad";
+  $("v-best").textContent = kr(top.value);
+  $("v-best-row").innerHTML = top.signs.map(s => `<span>${SIGNS[s]}</span>`).join("");
+  $("v-best-sub").textContent = `rad nr ${top.id} · chans ${topLv} rätt ${chance(top.P[0])}`;
+}
 const N = D.matches.length, done = D.matches.filter(m => m.finished).length, on = D.matches.filter(m => m.started && !m.finished).length;
 $("v-matches").textContent = `${done}/${N} klara`;
 $("v-mdots").innerHTML = D.matches.map(m => {
@@ -500,7 +508,13 @@ const A = D.analysis;
     const dream = [0, 1, 2].filter(o => d[o] != null && pr[o] < REAL && d[o] > d[best]).sort((a, b) => d[b] - d[a])[0];
     return { w, pr, d, best, dream, stake: d[best] - d[worst] };
   };
-  const list = A.weights.map(prep).sort((a, b) => b.stake - a.stake);
+  const all = A.weights.map(prep).sort((a, b) => b.stake - a.stake);
+  const W_SHOW = 5;
+  let wAll = store.get("kupong-allavikter") === "1";
+  $("weights-more").hidden = all.length <= W_SHOW;
+  $("weights-more").textContent = wAll ? `Visa bara de ${W_SHOW} viktigaste` : `Visa alla ${all.length} matcher`;
+  $("weights-more").onclick = () => { store.set("kupong-allavikter", wAll ? "0" : "1"); weights(); };
+  const list = wAll ? all : all.slice(0, W_SHOW);
   $("weights").innerHTML = list.map(({ w, pr, d, best, dream, stake }) => {
     const m = D.matches[w.nr - 1];
     const likely = [0, 1, 2].reduce((a, o) => pr[o] > pr[a] ? o : a, 0);
