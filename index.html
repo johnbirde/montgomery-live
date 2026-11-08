@@ -249,6 +249,31 @@ body { overflow-x: hidden; }
 .pay.hit { background: color-mix(in srgb, var(--good) 18%, transparent); }
 .pay.hit .pw strong { color: var(--good); }
 @media (max-width: 640px) { .pays { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pay b { font-size: 19px; } }
+.tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--open); justify-self: start; }
+.tabs button { font: 650 14px var(--body); color: var(--muted); background: transparent; border: 0; padding: 8px 18px; border-radius: 10px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--glass-strong); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tabpane { display: grid; gap: 20px; }
+.tabpane[hidden] { display: none; }
+.hist-hero .big { font-family: var(--display); font-size: 52px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.05; color: var(--accent); }
+.hist-hero .label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.hist-hero .cap { align-items: flex-start; }
+.hist-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.hist-tiles .card { display: grid; gap: 2px; padding: 16px; }
+.hist-tiles .lb { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.hist-tiles .v { font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.hist-tiles .v.pos { color: var(--good); } .hist-tiles .v.neg { color: var(--bad); }
+.hd { display: grid; grid-template-columns: minmax(0, 1fr) 160px; gap: 8px 16px; padding: 14px 0; border-top: 1px solid var(--hair); align-items: center; }
+.hd:first-child { border-top: 0; }
+.hd .t { font-weight: 700; }
+.hd .t .muted { font-weight: 500; }
+.hd .facit { display: flex; flex-wrap: wrap; gap: 3px; margin: 6px 0; }
+.hd .facit span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; background: var(--open); }
+.hd .st { font-size: 13px; color: var(--muted); }
+.hd .st b { color: var(--ink); }
+.hd .st .pos { color: var(--good); font-weight: 700; } .hd .st .neg { color: var(--bad); font-weight: 700; }
+.hd svg { width: 100%; height: 48px; display: block; }
+@media (max-width: 640px) { .hd { grid-template-columns: 1fr; } .hist-hero .big { font-size: 40px; } }
 </style>
 </head>
 <body>
@@ -270,6 +295,13 @@ body { overflow-x: hidden; }
       </div>
     </div>
   </header>
+
+  <nav class="tabs" role="tablist" aria-label="Vy">
+    <button type="button" role="tab" id="tabbtn-live" aria-selected="true">Live</button>
+    <button type="button" role="tab" id="tabbtn-hist" aria-selected="false">Historik</button>
+  </nav>
+
+  <div id="tab-live" class="tabpane">
 
   <section class="card payouts" id="payouts-card">
     <div class="cap"><h2>Utdelning just nu</h2><span class="muted" id="payouts-note" style="font-size:13px"></span></div>
@@ -353,6 +385,22 @@ body { overflow-x: hidden; }
     <h2>Så räknas det</h2>
     <p>Modellen levererar före spelstopp varje rad med förväntad utdelning per vinstnivå. Under kvällen räknas sannolikheten om för varje rad: färdiga matcher är 0 eller 100 %, övriga får sin sannolikhet från Oddsets odds med spelbolagets marginal borttagen. Värdet är summan av sannolikhet gånger förväntad utdelning. Chansen att någon rad får alla rätt är summan av radernas chans, eftersom raderna är olika.</p>
   </section>
+  </div>
+
+  <div id="tab-hist" class="tabpane" hidden>
+    <section class="card hist-hero">
+      <div class="cap"><div><div class="label">Syndikatets värde</div><div class="big num" id="h-saldo"></div>
+        <div class="muted num" id="h-saldo-sub"></div></div>
+        <div class="seg" role="group" aria-label="Visa"><button type="button" id="h-tot" aria-pressed="true">Totalt</button><button type="button" id="h-per" aria-pressed="false">Per andel</button></div></div>
+      <div id="h-chart"></div>
+    </section>
+    <section class="hist-tiles" id="h-tiles"></section>
+    <section class="card">
+      <h2>Omgångar</h2>
+      <div class="muted" style="font-size:13px;margin:2px 0 8px">Senaste först. Förväntat = kupongens värde vid spelstopp enligt modellens utdelning och Oddsets odds.</div>
+      <div id="h-draws"></div>
+    </section>
+  </div>
 </div>
 
 <script>
@@ -566,10 +614,17 @@ function renderEvents() {
       lastAlive = e.alive;
     }
   }
+  // händelser i samma uppdatering delar på samma före/efter: visa effekten en gång (på den första)
+  const isImpact = e => !["halvtid", "avspark"].includes(e.type);
+  const groups = new Map();
+  for (const e of all) if (isImpact(e)) { const g = groups.get(e.at) || []; g.push(e); groups.set(e.at, g); }
+  const short = e => e.nr ? `${e.title.replace(", ", " ")} (${e.match})` : e.title;
   const evs = [...all].reverse();
   const list = evAll ? evs : evs.slice(0, EV_SHOW);
   $("events").innerHTML = list.map(e => {
-    const impact = !["halvtid", "avspark"].includes(e.type);
+    const g = isImpact(e) ? groups.get(e.at) || [e] : [e];
+    const primary = g[0] === e;
+    const impact = isImpact(e) && primary;
     const dv = e.after - e.before, moved = impact && Math.abs(dv) >= 0.5;
     const cls = !moved ? "" : dv > 0 ? "up" : "down";
     const dtxt = moved ? (dv > 0 ? "+" : "−") + krInt(Math.abs(dv)) : "";
@@ -579,6 +634,10 @@ function renderEvents() {
     if (e.type === "mål" && e.rows_now != null && e.sign_now) fx.push(`${e.rows_now} av ${D.rows.length} rader har ${e.sign_now}`);
     if (e.type === "utdelning" && e.match) fx.push(e.match.charAt(0).toUpperCase() + e.match.slice(1));
     if (aliveNote.has(e)) fx.push(aliveNote.get(e));
+    if (g.length > 1 && Math.abs(dv) >= 0.5) {
+      if (primary) fx.push(`tillsammans med ${g.slice(1).map(short).join(", ")} (samma uppdatering)`);
+      else fx.push(`effekten ingår i ${short(g[0])}`);
+    }
     const title = e.type === "utdelning" && /^alla klara/.test(e.match || "") ? "Slutlig utdelning" : e.title;
     return `<li class="ev ${e.type === "mål" ? "mal" : e.type}">
       <span class="t">${hhmm(e.at)}</span><span class="mark"></span>
@@ -635,6 +694,72 @@ function chart() {
   </svg>`;
 }
 chart();
+
+// ---- flikar och historik ----
+(function tabs() {
+  const show = t => {
+    $("tab-live").hidden = t !== "live"; $("tab-hist").hidden = t !== "hist";
+    $("tabbtn-live").setAttribute("aria-selected", String(t === "live")); $("tabbtn-hist").setAttribute("aria-selected", String(t === "hist"));
+    store.set("kupong-flik", t);
+    if (t === "hist") renderHistory(); else chart();
+  };
+  $("tabbtn-live").onclick = () => show("live"); $("tabbtn-hist").onclick = () => show("hist");
+  show(store.get("kupong-flik") === "hist" ? "hist" : "live");
+})();
+function renderHistory() {
+  const H = D.history;
+  if (!H) { $("h-draws").innerHTML = '<p class="muted">Ingen historik än.</p>'; return; }
+  const per = store.get("kupong-hper") === "1";
+  $("h-tot").setAttribute("aria-pressed", String(!per)); $("h-per").setAttribute("aria-pressed", String(per));
+  $("h-tot").onclick = () => { store.set("kupong-hper", "0"); renderHistory(); };
+  $("h-per").onclick = () => { store.set("kupong-hper", "1"); renderHistory(); };
+  const S = H.saldo || [], last = S[S.length - 1];
+  const shareOf = x => x.per_andel != null ? x.per_andel : x.saldo / D.shares;
+  if (last) {
+    $("h-saldo").textContent = krInt(per ? shareOf(last) : last.saldo);
+    const prev = S.length > 1 ? S[S.length - 2] : null;
+    const ch = prev ? (per ? shareOf(last) - shareOf(prev) : last.saldo - prev.saldo) : null;
+    $("h-saldo-sub").innerHTML = `${per ? `totalt ${krInt(last.saldo)}` : `${krInt(shareOf(last))} per andel (${D.shares} andelar)`} · efter omgång ${last.omgang} (${last.datum})`
+      + (ch !== null ? ` · <span class="${ch >= 0 ? "delta up" : "delta down"}">${ch >= 0 ? "+" : "−"}${krInt(Math.abs(ch))} sedan förra</span>` : "");
+  } else { $("h-saldo").textContent = "–"; $("h-saldo-sub").textContent = "Inget saldo inlagt än (data/saldo.csv)."; }
+  (function saldoChart() {
+    const P = S.map(x => [new Date(x.datum + "T12:00:00").getTime(), per ? shareOf(x) : x.saldo, x]);
+    if (P.length < 2) { $("h-chart").innerHTML = '<p class="muted" style="margin:10px 0 0">Kurvan fylls på med en punkt efter varje omgång.</p>'; return; }
+    const W = Math.max(280, $("h-chart").clientWidth || 900), H2 = 200, L = 64, R = 16, T = 14, B = 26;
+    const t0 = P[0][0], t1 = P[P.length - 1][0];
+    let lo = Math.min(...P.map(p => p[1])), hi = Math.max(...P.map(p => p[1])); const pad = Math.max((hi - lo) * 0.15, hi * 0.03, 1); lo -= pad; hi += pad;
+    const x = t => L + (W - L - R) * (t - t0) / Math.max(1, t1 - t0), y = v => T + (H2 - T - B) * (1 - (v - lo) / (hi - lo));
+    const pts = P.map(p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
+    let g = ""; for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo) * i / 3; g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--hair)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="12" fill="var(--muted)">${Math.round(v).toLocaleString("sv-SE")}</text>`; }
+    const dots = P.map(p => `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="4" fill="var(--accent)"><title>${p[2].datum} omgång ${p[2].omgang}: ${krInt(p[1])}</title></circle>`).join("");
+    $("h-chart").innerHTML = `<svg viewBox="0 0 ${W} ${H2}" style="width:100%;height:${H2}px;display:block;margin-top:10px" role="img" aria-label="Syndikatets värde över tid">${g}
+      <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>`;
+  })();
+  const T = H.totals || {};
+  const tiles = [["Omgångar", String(T.draws || 0), ""], ["Total insats", krInt(T.stake || 0), ""], ["Total vinst", krInt(T.win || 0), ""],
+    ["Netto", `${(T.net || 0) >= 0 ? "+" : "−"}${krInt(Math.abs(T.net || 0))}`, (T.net || 0) >= 0 ? "pos" : "neg"],
+    ["Förväntat vid spelstopp", T.expected_n ? krInt(T.expected) : "–", ""], ["Utfall / förväntat", T.expected ? Math.round(100 * T.win / T.expected) + " %" : "–", ""]];
+  $("h-tiles").innerHTML = tiles.map(([l, v, c]) => `<div class="card"><span class="lb">${l}</span><span class="v num ${c}">${v}</span></div>`).join("");
+  const months = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+  const fmtDate = d => { if (!d) return ""; const t = new Date(d + "T12:00:00"); return `${["sön", "mån", "tis", "ons", "tor", "fre", "lör"][t.getDay()]} ${t.getDate()} ${months[t.getMonth()]}`; };
+  $("h-draws").innerHTML = (H.draws || []).map(d => {
+    const name = d.product.charAt(0).toUpperCase() + d.product.slice(1);
+    const facit = d.facit ? `<div class="facit">${d.facit.map(s => `<span>${s >= 0 ? SIGNS[s] : "–"}</span>`).join("")}</div>` : "";
+    const hits = d.done ? d.levels.filter(l => d.hits[l]).map(l => `${d.hits[l]} × ${l} rätt à ${krInt(d.payouts[l])}`).join(", ") : "";
+    const st = d.done
+      ? `${d.rows.toLocaleString("sv-SE")} rader · bästa <b>${d.best} rätt</b>${d.best_n > 1 ? ` (${d.best_n} st)` : ""}${hits ? ` · ${hits}` : ""}<br>`
+        + `vinst <b>${krInt(d.win)}</b> · netto <span class="${d.net >= 0 ? "pos" : "neg"}">${d.net >= 0 ? "+" : "−"}${krInt(Math.abs(d.net))}</span>`
+        + (d.expected != null ? ` · förväntat ${krInt(d.expected)} · högst ${krInt(d.peak)}` : "")
+      : `${d.rows.toLocaleString("sv-SE")} rader · pågår`;
+    let spark = "";
+    if (d.curve && d.curve.length > 2) {
+      const C = d.curve.map(([t, v]) => [new Date(t).getTime(), v]), a = C[0][0], b = C[C.length - 1][0], mx = Math.max(...C.map(c => c[1]), 1);
+      const W = 160, Hh = 48, pp = C.map(([t, v]) => `${(W * (t - a) / Math.max(1, b - a)).toFixed(1)},${(Hh - 3 - (Hh - 6) * v / mx).toFixed(1)}`).join(" ");
+      spark = `<svg viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" aria-label="Kvällens kurva"><polyline points="${pp}" fill="none" stroke="var(--accent)" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;
+    }
+    return `<div class="hd"><div><div class="t">${name} ${d.draw} <span class="muted">· ${fmtDate(d.date)}</span></div>${facit}<div class="st num">${st}</div></div><div>${spark}</div></div>`;
+  }).join("") || '<p class="muted">Inga omgångar än.</p>';
+}
 let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(chart, 150); });
 
 // lokal fil: ladda om var 20:e s och behåll scrollläget (i artefakten byts versionen automatiskt)
