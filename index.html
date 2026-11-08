@@ -258,6 +258,7 @@ body { overflow-x: hidden; }
       <div class="eyebrow" id="group"></div>
       <h1 id="title"></h1>
       <div class="muted" id="subtitle"></div>
+      <div class="muted num" id="saldo" hidden></div>
     </div>
     <div class="hdr-right">
       <span class="pill live" id="livepill"></span>
@@ -379,6 +380,11 @@ const topLv = D.levels[0];
 $("title").textContent = D.title;
 $("group").textContent = D.group || "";
 $("subtitle").textContent = `${D.rows.length} rader, ${D.shares} andelar. Spelstopp ${D.close ? hhmm(D.close) : "?"}.`;
+if (D.saldo) {
+  const sEl = $("saldo");
+  sEl.textContent = `Syndikatets saldo före omgången: ${krInt(D.saldo.saldo)} (${krInt(D.saldo.saldo / D.shares)} per andel)`;
+  sEl.hidden = false;
+}
 const pill = $("livepill");
 pill.innerHTML = D.state === "live" ? '<span class="dot"></span>LIVE' : D.state === "klar" ? "KLAR" : "FÖRE SPELSTOPP";
 pill.style.background = D.state === "live" ? "var(--bad)" : D.state === "klar" ? "var(--good)" : "var(--muted)";
