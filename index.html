@@ -357,7 +357,7 @@ body { overflow-x: hidden; }
     <div class="cap"><h2>Hur kan det sluta?</h2><span class="muted" id="dist-method" style="font-size:13px"></span></div>
     <div class="dist-stats num" id="dist-stats"></div>
     <div class="bars" id="dist-bars"></div>
-    <div class="muted" style="font-size:12.5px;margin-top:10px">Fördelningen av kupongens slututdelning över alla möjliga utfall i matcherna som återstår, viktade med Oddsets sannolikheter. Antar oberoende matcher och modellens förväntade utdelning per nivå.</div>
+    <div class="muted" style="font-size:12.5px;margin-top:10px">Fördelningen av kupongens slututdelning över alla möjliga utfall i matcherna som återstår, viktade med Oddsets sannolikheter. Klasserna följer stadgarna §5: under 10 × insatsen ingen fest, 10–25 × vinstfest, över 25 × utdelning. Antar oberoende matcher och modellens förväntade utdelning per nivå.</div>
   </section>
 
   <div class="cols">
@@ -591,7 +591,8 @@ const A = D.analysis;
   if (!A) { $("dist-card").hidden = true; return; }
   $("dist-method").textContent = A.method === "klart" ? "alla matcher klara" : `${A.open} matcher kvar · ${A.method}`;
   $("dist-stats").innerHTML = [
-    ["chans att gå plus", pct(A.p_plus)], ["chans till någon vinst", pct(A.p_any)],
+    ["chans att gå plus", pct(A.p_plus)], ["chans till vinstfest (≥10 ×)", A.p_fest != null ? chance(A.p_fest) : "–"],
+    ["chans till utdelning (≥25 ×)", A.p_utd != null ? chance(A.p_utd) : "–"],
     ["median", krInt(A.p50)], ["90:e percentilen", krInt(A.p90)], ["bästa möjliga", krInt(A.max)]
   ].map(([l, v]) => `<div><b>${v}</b>${l}</div>`).join("");
   const pmax = Math.max(...A.buckets.map(b => b.p), 0.0001);
@@ -748,7 +749,7 @@ function renderHistory() {
     const hits = d.done ? d.levels.filter(l => d.hits[l]).map(l => `${d.hits[l]} × ${l} rätt à ${krInt(d.payouts[l])}`).join(", ") : "";
     const st = d.done
       ? `${d.rows.toLocaleString("sv-SE")} rader · bästa <b>${d.best} rätt</b>${d.best_n > 1 ? ` (${d.best_n} st)` : ""}${hits ? ` · ${hits}` : ""}<br>`
-        + `vinst <b>${krInt(d.win)}</b> · netto <span class="${d.net >= 0 ? "pos" : "neg"}">${d.net >= 0 ? "+" : "−"}${krInt(Math.abs(d.net))}</span>`
+        + `vinst <b>${krInt(d.win)}</b> (${(d.win / d.stake).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} × insatsen: ${d.win >= 25 * d.stake ? "<b>utdelning + vinstfest</b>" : d.win >= 10 * d.stake ? "<b>vinstfest</b>" : "ingen fest"}) · netto <span class="${d.net >= 0 ? "pos" : "neg"}">${d.net >= 0 ? "+" : "−"}${krInt(Math.abs(d.net))}</span>`
         + (d.expected != null ? ` · förväntat ${krInt(d.expected)} · högst ${krInt(d.peak)}` : "")
       : `${d.rows.toLocaleString("sv-SE")} rader · pågår`;
     let spark = "";
@@ -760,7 +761,7 @@ function renderHistory() {
     return `<div class="hd"><div><div class="t">${name} ${d.draw} <span class="muted">· ${fmtDate(d.date)}</span></div>${facit}<div class="st num">${st}</div></div><div>${spark}</div></div>`;
   }).join("") || '<p class="muted">Inga omgångar än.</p>';
 }
-let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(chart, 150); });
+let rz; window.onresize = () => { clearTimeout(rz); rz = setTimeout(chart, 150); };
 
 // lokal fil: ladda om var 20:e s och behåll scrollläget (i artefakten byts versionen automatiskt)
 if (location.protocol === "file:") {
@@ -773,7 +774,19 @@ if (location.protocol === "file:") {
 const PARAMS = new URLSearchParams(location.hash.slice(1));
 const DRAW_ID = PARAMS.get("d"), KEY_B64 = PARAMS.get("k");
 const b64 = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
-let lastUpdated = null, keyObj = null, rendered = false;
+let lastUpdated = null, keyObj = null, rendered = false, skeleton = null;
+// Rita om på plats vid ny data (ingen omladdning): behåll läsläget genom att hålla kvar
+// det kort man läser på samma ställe på skärmen, även om något ovanför har vuxit.
+function rerender(D) {
+  const wrap = document.querySelector(".wrap");
+  const cards = () => [...wrap.querySelectorAll("section")];
+  const vis = cards(), i = vis.findIndex(el => el.offsetParent !== null && el.getBoundingClientRect().bottom > 0);
+  const off = i >= 0 ? vis[i].getBoundingClientRect().top : 0, y = scrollY;
+  wrap.innerHTML = skeleton;
+  main(D);
+  const el = i >= 0 ? cards()[i] : null;
+  if (el && el.offsetParent !== null) scrollTo(0, scrollY + el.getBoundingClientRect().top - off); else scrollTo(0, y);
+}
 function showMessage(title, text) {
   document.querySelector(".wrap").innerHTML = `<header><div><div class="eyebrow">Montgomery Syndikatet</div><h1>${title}</h1><div class="muted">${text}</div></div></header>`;
 }
@@ -788,8 +801,9 @@ async function load() {
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, keyObj, b64(enc.ct));
     const D = JSON.parse(new TextDecoder().decode(plain));
     lastUpdated = enc.updated;
-    if (rendered) { location.reload(); return; }   // ny data: rita om (scrollläget behålls)
+    if (rendered) { rerender(D); return; }
     rendered = true;
+    skeleton = document.querySelector(".wrap").innerHTML;
     document.title = `${D.group || "Kupongen"} live: ${D.title}`;
     main(D);
   } catch (e) {
@@ -797,8 +811,6 @@ async function load() {
     console.error(e);
   }
 }
-try { const y = sessionStorage.getItem("kupong-y"); if (y) addEventListener("load", () => setTimeout(() => scrollTo(0, +y), 50)); } catch (e) {}
-addEventListener("beforeunload", () => { try { sessionStorage.setItem("kupong-y", String(scrollY)); } catch (e) {} });
 load();
 setInterval(load, 30000);
 </script>
